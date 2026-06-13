@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python-Linked Voice Assistant</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background-color: #f4f7f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { text-align: center; background-color: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); width: 90%; max-width: 500px; }
+        h1 { color: #005c97; }
+        #start-btn { background-color: #005c97; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 8px; cursor: pointer; transition: background-color 0.3s; }
+        #start-btn:disabled { background-color: #999; cursor: not-allowed; }
+        .log-container { margin-top: 30px; text-align: left; background-color: #f0f0f0; padding: 15px; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Voice Assistant</h1>
+        <p>Linked to a Python Backend 🐍</p>
+        <button id="start-btn">🎙️ Start Listening</button>
+        <div class="log-container">
+            <p><strong>You Said:</strong> <span id="user-text">...</span></p>
+            <p><strong>Assistant Response:</strong> <span id="assistant-text">...</span></p>
+        </div>
+    </div>
+
+    <script>
+        const startBtn = document.getElementById('start-btn');
+        const userText = document.getElementById('user-text');
+        const assistantText = document.getElementById('assistant-text');
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+
+        function speak(text) {
+            assistantText.textContent = text;
+            const utterance = new SpeechSynthesisUtterance(text);
+            window.speechSynthesis.speak(utterance);
+        }
+
+        async function sendCommandToServer(command) {
+            try {
+                // This sends the command to the Python Flask server
+                const response = await fetch('http://127.0.0.1:5000/process-command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: command }),
+                });
+                
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+
+                const data = await response.json();
+                speak(data.message); // Speak the message received from Python
+
+            } catch (error) {
+                console.error('Error connecting to server:', error);
+                speak("Sorry, I couldn't connect to the Python server. Is it running?");
+            }
+        }
+
+        startBtn.addEventListener('click', () => recognition.start());
+        recognition.onstart = () => {
+            startBtn.textContent = "🔵 Listening...";
+            startBtn.disabled = true;
+        };
+        recognition.onresult = (event) => {
+            const command = event.results[0][0].transcript;
+            userText.textContent = command;
+            sendCommandToServer(command);
+        };
+        recognition.onend = () => {
+            startBtn.textContent = "🎙️ Start Listening";
+            startBtn.disabled = false;
+        };
+        recognition.onerror = (event) => {
+            assistantText.textContent = `Speech recognition error: ${event.error}`;
+        };
+    </script>
+</body>
+</html>
